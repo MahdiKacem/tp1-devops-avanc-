@@ -440,3 +440,11 @@ gitops-demo-dev   Synced        Healthy
 
 Ce test confirme que `selfHeal: true` fonctionne et que l'état réel du cluster
 est ramené vers l'état désiré défini dans le dépôt Git.
+
+## 14. Support de démonstration
+
+Les commandes, logs et résultats détaillés pour la démonstration depuis le
+tableau de bord Argo CD et le terminal sont regroupés dans
+[DEMONSTRATION.md](DEMONSTRATION.md). Le document couvre le déploiement
+continu, le drift et le Self-Healing, la différence entre Sync et Health,
+ainsi que l'historique et le rollback.
