@@ -4,4 +4,4 @@ metadata:
   name: gitops-demo
   namespace: gitops-demo
 spec:
-  replicas: 1
+  replicas: 3
