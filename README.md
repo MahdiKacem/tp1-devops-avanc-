@@ -14,6 +14,8 @@ communes des configurations propres à chaque environnement.
 │   ├── kustomization.yaml
 │   ├── namespace.yaml
 │   └── service.yaml
+├── argocd/
+│   └── application-dev.yaml
 └── overlays/
     ├── dev/
     │   ├── kustomization.yaml
@@ -28,6 +30,9 @@ communes des configurations propres à chaque environnement.
   propres paramètres.
 - Argo CD pourra ensuite référencer directement
   `overlays/dev` ou `overlays/prod` comme source Git.
+- `argocd/application-dev.yaml` déclare l'Application Argo CD de
+  l'environnement de développement, avec synchronisation automatique et
+  self-healing.
 
 ## Validation locale
 

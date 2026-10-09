@@ -4,7 +4,7 @@
 **Sujet :** Étape 1 — Structure du dépôt Git pour une démarche GitOps  
 **Application choisie :** NGINX  
 **Outil de templating :** Kustomize  
-**État d'avancement :** Étape 1 terminée, dépôt prêt à être publié et référencé par Argo CD
+**État d'avancement :** Étapes 1 et 2 terminées, application synchronisée par Argo CD
 
 ## 1. Objectif du TP
 
@@ -303,3 +303,140 @@ déclarative et adaptée à GitOps. L'erreur Kustomize rencontrée lors de la
 validation a été identifiée, expliquée et corrigée. Les deux configurations
 d'environnement sont maintenant valides et prêtes à être consommées par
 Argo CD.
+
+## 13. Étape 2 — Configuration dans Argo CD
+
+### 13.1 Création du cluster Kind
+
+Après l'activation de Docker Desktop et de son intégration WSL, un cluster
+Kind nommé `gitops` a été créé :
+
+```bash
+kind create cluster --name gitops
+```
+
+Résultat :
+
+```text
+Set kubectl context to "kind-gitops"
+You can now use your cluster with:
+kubectl cluster-info --context kind-gitops
+```
+
+Vérification du nœud :
+
+```text
+NAME                   STATUS   ROLES           AGE   VERSION
+gitops-control-plane   Ready    control-plane   ...   v1.30.0
+```
+
+### 13.2 Installation d'Argo CD
+
+Argo CD a été installé dans le namespace `argocd` avec le manifest officiel :
+
+```powershell
+kubectl apply -n argocd -f
+  https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+La première application a rencontré cette erreur sur la CRD
+`applicationsets.argoproj.io` :
+
+```text
+metadata.annotations: Too long: must have at most 262144 bytes
+```
+
+L'installation a été finalisée avec l'application server-side :
+
+```powershell
+kubectl apply --server-side --force-conflicts -n argocd -f
+  https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+Tous les composants Argo CD sont ensuite devenus disponibles :
+
+```text
+argocd-application-controller       1/1 Running
+argocd-applicationset-controller    1/1 Running
+argocd-dex-server                   1/1 Running
+argocd-notifications-controller    1/1 Running
+argocd-redis                        1/1 Running
+argocd-repo-server                  1/1 Running
+argocd-server                       1/1 Running
+```
+
+### 13.3 Création de l'Application
+
+La ressource [argocd/application-dev.yaml](argocd/application-dev.yaml)
+déclare l'application Argo CD :
+
+```yaml
+source:
+  repoURL: https://github.com/MahdiKacem/tp1-devops-avanc-.git
+  targetRevision: main
+  path: overlays/dev
+destination:
+  server: https://kubernetes.default.svc
+  namespace: gitops-demo
+```
+
+Elle a été créée avec :
+
+```powershell
+kubectl apply -f argocd\application-dev.yaml
+```
+
+La politique de synchronisation est la suivante :
+
+```yaml
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+```
+
+- `automated` autorise la synchronisation automatique des changements Git.
+- `prune` supprime les ressources retirées de la configuration Git.
+- `selfHeal` corrige les changements effectués directement dans le cluster.
+- `CreateNamespace=true` permet de créer automatiquement `gitops-demo`.
+
+### 13.4 Résultat de synchronisation
+
+Après création de l'Application, Argo CD a rendu l'état suivant :
+
+```text
+NAME              SYNC STATUS   HEALTH STATUS
+gitops-demo-dev   Synced        Healthy
+```
+
+Les ressources déployées dans le namespace `gitops-demo` sont :
+
+```text
+pod/gitops-demo-dev-...       1/1 Running
+service/gitops-demo-dev      ClusterIP   80/TCP
+deployment/gitops-demo-dev   1/1         1   1
+```
+
+### 13.5 Test du Self-Healing
+
+Pour vérifier que le Self-Healing est actif, une dérive a été provoquée
+manuellement :
+
+```powershell
+kubectl -n gitops-demo scale deployment/gitops-demo-dev --replicas=3
+```
+
+Après quelques secondes, Argo CD a rétabli la valeur déclarée dans Git :
+
+```text
+NAME              DESIRED   READY
+gitops-demo-dev   1         1
+
+NAME              SYNC STATUS   HEALTH STATUS
+gitops-demo-dev   Synced        Healthy
+```
+
+Ce test confirme que `selfHeal: true` fonctionne et que l'état réel du cluster
+est ramené vers l'état désiré défini dans le dépôt Git.
